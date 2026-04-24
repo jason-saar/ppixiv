@@ -34876,6 +34876,7 @@ async function Bootstrap({bundle}={})
     window.MessagePort.prototype.xhrServerPostMessage = window.MessagePort.prototype.postMessage;
     function createXhrHandler()
     {
+        console.log('[safari-fix] createXhrHandler called');
         let { port1: clientPort, port2: serverPort }  = new MessageChannel();
         window.postMessage({ cmd: "download-setup" }, "*", [clientPort]);
 
@@ -35004,6 +35005,7 @@ async function Bootstrap({bundle}={})
 
     // Listen to requests from helpers._get_xhr_server.
     window.addEventListener("request-download-channel", (e) => {
+        console.log('[safari-fix] request-download-channel fired');
         e.preventDefault();
         createXhrHandler();
     });
