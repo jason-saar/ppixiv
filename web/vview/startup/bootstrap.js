@@ -169,17 +169,16 @@ async function Bootstrap({
         script.remove();
     }
     // Temporary pximg test
-    GM.xmlHttpRequest({
-        method: 'GET',
-        url: 'https://i.pximg.net/img-original/img/2026/04/24/19/24/07/143935039_p0.png',
-        headers: {
-            'Referer': 'https://www.pixiv.net/',
-            'Cache-Control': 'max-age=360000'
-        },
-        responseType: 'arraybuffer',
-        onload: r => console.log('[pximg-test] status:', r.status, 'byteLength:', r.response?.byteLength),
-        onerror: e => console.error('[pximg-test] error:', e)
-    });
+    setTimeout(() => {
+        GM.xmlHttpRequest({
+            method: 'GET',
+            url: 'https://i.pximg.net/img-original/img/2026/04/24/19/24/07/143935039_p0.png',
+            headers: { 'Referer': 'https://www.pixiv.net/' },
+            responseType: 'arraybuffer',
+            onload: r => console.log('[pximg-test-delayed] status:', r.status, 'byteLength:', r.response?.byteLength),
+            onerror: e => console.error('[pximg-test-delayed] error:', e)
+        });
+    }, 3000);
 
     runScript(bundle);
 }
