@@ -27,10 +27,13 @@ async function Bootstrap({bundle}={})
     window.MessagePort.prototype.xhrServerPostMessage = window.MessagePort.prototype.postMessage;
     function createXhrHandler()
     {
+        console.log('[safari-fix] createXhrHandler called');
         let { port1: clientPort, port2: serverPort }  = new MessageChannel();
         window.postMessage({ cmd: "download-setup" }, "*", [clientPort]);
 
         serverPort.onmessage = async (e) => {
+            serverPort.onmessage = async (e) => {
+            console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
             let responsePort = e.ports[0];
             let {
                 url,
@@ -155,6 +158,7 @@ async function Bootstrap({bundle}={})
 
     // Listen to requests from helpers._get_xhr_server.
     window.addEventListener("request-download-channel", (e) => {
+        console.log('[safari-fix] request-download-channel fired');
         e.preventDefault();
         createXhrHandler();
     });
