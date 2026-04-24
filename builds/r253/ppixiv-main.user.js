@@ -34886,9 +34886,7 @@ async function Bootstrap({
             cmd: "download-setup"
         }, "*", [clientPort]);
 
-        serverPort.onmessage = async (e) => {
-            console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
-            
+        async function handleRequest(e) {
             let responsePort = e.ports[0];
             let {
                 url,
@@ -34903,8 +34901,7 @@ async function Bootstrap({
             const isCotrans = url?.includes('cotrans.touhou.ai');
 
             if (formData && isCotrans) {
-                // Safari/Userscripts fix: serialize FormData manually for Cotrans
-                console.log('[safari-fix] GM available:', typeof GM !== 'undefined', 'handler:', GM?.info?.scriptHandler);
+                console.log('[safari-fix] Cotrans upload detected');
                 const isUserscriptsSafari = typeof GM !== 'undefined' &&
                     GM.info?.scriptHandler === 'Userscripts';
                 console.log('[safari-fix] isUserscriptsSafari:', isUserscriptsSafari);
@@ -34943,16 +34940,15 @@ async function Bootstrap({
                     for (let [key, value] of Object.entries(formData)) {
                         if (value.toString() == "[object ArrayBuffer]")
                             value = new Blob([value]);
-                        data.append(key, value, 'blob');;
+                        data.append(key, value, 'blob');
                     }
                 }
             } else if (formData) {
-                // Non-Cotrans FormData — use original approach
                 data = new FormData();
                 for (let [key, value] of Object.entries(formData)) {
                     if (value.toString() == "[object ArrayBuffer]")
                         value = new Blob([value]);
-                    data.append(key, value, 'blob');;
+                    data.append(key, value, 'blob');
                 }
             }
 
@@ -34971,29 +34967,26 @@ async function Bootstrap({
                 return;
             }
 
+            const safeHeaders = { ...(headers || {}), ...extraHeaders };
+            delete safeHeaders['Origin'];
+
             const xhrOptions = {
                 method,
-                headers: { ...(headers || {}), ...extraHeaders },
+                headers: safeHeaders,
                 responseType: responseType || 'arraybuffer',
                 url: url.toString(),
                 onload: (result) => {
                     console.log('[safari-fix] GM.xmlHttpRequest onload, status:', result.status, 'url:', url.toString());
                     let success = result.status < 400;
                     let error = `HTTP ${result.status}`;
-                    let {
-                        response
-                    } = result;
+                    let { response } = result;
                     let transfer = [];
                     if (response instanceof ArrayBuffer)
                         transfer.push(response);
-                    responsePort.xhrServerPostMessage({
-                        success,
-                        error,
-                        response
-                    }, transfer);
+                    responsePort.xhrServerPostMessage({ success, error, response }, transfer);
                 },
-                onerror: (e) => {
-                    console.error('[safari-fix] GM.xmlHttpRequest onerror:', e);
+                onerror: (err) => {
+                    console.error('[safari-fix] GM.xmlHttpRequest onerror:', err);
                     responsePort.xhrServerPostMessage({
                         success: false,
                         error: "Request error"
@@ -35002,6 +34995,11 @@ async function Bootstrap({
             };
             if (data != null) xhrOptions.data = data;
             GM.xmlHttpRequest(xhrOptions);
+        }
+
+        serverPort.onmessage = (e) => {
+            console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
+            handleRequest(e).catch(err => console.error('[safari-fix] handleRequest error:', err));
         };
 
     } // closes createXhrHandler
