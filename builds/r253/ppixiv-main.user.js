@@ -34889,11 +34889,6 @@ async function Bootstrap({
         serverPort.onmessage = async (e) => {
             console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
             
-            if(!e.data?.url?.includes('cotrans.touhou.ai')) {
-                console.log('[safari-fix] ignoring non-Cotrans request');
-                return;
-            }
-            
             let responsePort = e.ports[0];
             let {
                 url,
