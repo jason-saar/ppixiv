@@ -34978,13 +34978,9 @@ async function Bootstrap({
 
             const xhrOptions = {
                 method,
-                headers: {
-                    ...(headers || {}),
-                    ...extraHeaders
-                },
+                headers: { ...(headers || {}), ...extraHeaders },
                 responseType: responseType || 'arraybuffer',
                 url: url.toString(),
-                withCredentials: true,
                 onload: (result) => {
                     console.log('[safari-fix] GM.xmlHttpRequest onload, status:', result.status, 'url:', url.toString());
                     let success = result.status < 400;
@@ -35018,7 +35014,7 @@ async function Bootstrap({
     // Listen to requests from helpers._get_xhr_server.
     window.addEventListener("request-download-channel", (e) => {
         console.log('[safari-fix] request-download-channel fired');
-        // e.preventDefault();
+        e.preventDefault();
         createXhrHandler();
     });
 
