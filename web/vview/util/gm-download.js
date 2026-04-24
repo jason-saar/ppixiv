@@ -75,19 +75,82 @@ function _downloadUsingServer(serverPort, { url, ...args })
 // This is only used to download Pixiv images to save to disk.  Pixiv doesn't have CORS
 // set up to give itself access to its own images, so we have to use GM.xmlHttpRequest to
 // do this.
+// Download url, returning the data.
+//
+// This is only used to download Pixiv images to save to disk.  Pixiv doesn't have CORS
+// set up to give itself access to its own images, so we have to use GM.xmlHttpRequest to
+// do this.
+//
+// On Safari/Userscripts, GM.xmlHttpRequest strips Referer/Origin headers, causing pximg
+// to return 403.  In that case, fall back to a canvas-based approach using the browser's
+// own image loading which includes cookies and auth.
 export async function downloadPixivImage(url)
 {
     let server = await _getDownloadServer();
     if(server == null)
         throw new Error("Downloading not available");
 
-    return await _downloadUsingServer(server, {
-        url,
-        headers: {
-            "Cache-Control": "max-age=360000",
-            Referer: "https://www.pixiv.net/",
-            Origin: "https://www.pixiv.net/",
-        },
+    try {
+        return await _downloadUsingServer(server, {
+            url,
+            headers: {
+                "Cache-Control": "max-age=360000",
+                Referer: "https://www.pixiv.net/",
+                Origin: "https://www.pixiv.net/",
+            },
+        });
+    } catch(e) {
+        // If GM.xmlHttpRequest returned 403 (Safari strips auth headers),
+        // fall back to canvas-based download
+        if(e.message === 'HTTP 403') {
+            console.log(`GM.xmlHttpRequest 403 for ${url}, trying canvas fallback`);
+            return await _downloadViaCanvas(url);
+        }
+        throw e;
+    }
+}
+
+async function _downloadViaCanvas(url)
+{
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(blob => {
+                    blob.arrayBuffer().then(resolve).catch(reject);
+                }, 'image/jpeg', 0.95);
+            } catch(e) {
+                reject(new Error('Canvas error: ' + e.message));
+            }
+        };
+        img.onerror = () => {
+            // crossOrigin anonymous failed — try without it
+            // (image may already be cached without CORS headers)
+            const img2 = new Image();
+            img2.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img2.naturalWidth;
+                    canvas.height = img2.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img2, 0, 0);
+                    canvas.toBlob(blob => {
+                        blob.arrayBuffer().then(resolve).catch(reject);
+                    }, 'image/jpeg', 0.95);
+                } catch(e) {
+                    reject(new Error('Canvas tainted: ' + e.message));
+                }
+            };
+            img2.onerror = () => reject(new Error('Image load failed'));
+            img2.src = url;
+        };
+        img.src = url;
     });
 }
 
