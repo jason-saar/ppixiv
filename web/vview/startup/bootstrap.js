@@ -30,7 +30,7 @@ async function Bootstrap({bundle}={})
         let { port1: clientPort, port2: serverPort }  = new MessageChannel();
         window.postMessage({ cmd: "download-setup" }, "*", [clientPort]);
 
-        serverPort.onmessage = (e) => {
+        serverPort.onmessage = async (e) => {
             let responsePort = e.ports[0];
             let {
                 url,
@@ -46,21 +46,60 @@ async function Bootstrap({bundle}={})
             // FormData.  For some reason FormData objects themselves can't be sent
             // over a MessagePort.
             let data = null;
+            let extraHeaders = {};
             if(formData)
             {
-                data = new FormData();
-                for(let [key, value] of Object.entries(formData))
+                const isUserscriptsSafari = typeof GM !== 'undefined' &&
+                    GM.info?.scriptHandler === 'Userscripts';
+                if(isUserscriptsSafari)
                 {
-                    // The value might be a blob or an ArrayBuffer.  Convert it to a blob.
-                    //
-                    // A bug in Firefox and/or FireMonkey causes the ArrayBuffer to be from the
-                    // page context instead of the script context, which breaks "value instanceof ArrayBuffer".
-                    // We can just not check, since constructing a blob from a blob doesn't hurt
-                    // anything.
-                    if(value.toString() == "[object ArrayBuffer]")
-                        value = new Blob([value]);
-                
-                    data.append(key, value);
+                    const boundary = '----ppixivFormData' + Math.random().toString(36).slice(2);
+                    const enc = new TextEncoder();
+                    const parts = [];
+                    for(let [key, value] of Object.entries(formData))
+                    {
+                        let header = `--${boundary}\r\nContent-Disposition: form-data; name="${key}"`;
+                        if(value.toString() === '[object ArrayBuffer]' || value instanceof Blob)
+                        {
+                            const bytes = value instanceof Blob
+                                ? new Uint8Array(await value.arrayBuffer())
+                                : new Uint8Array(value);
+                            const mime = value instanceof Blob
+                                ? (value.type || 'application/octet-stream')
+                                : 'application/octet-stream';
+                            header += `; filename="blob"\r\nContent-Type: ${mime}\r\n\r\n`;
+                            parts.push(enc.encode(header), bytes, enc.encode('\r\n'));
+                        }
+                        else
+                        {
+                            header += `\r\n\r\n${value}\r\n`;
+                            parts.push(enc.encode(header));
+                        }
+                    }
+                    parts.push(enc.encode(`--${boundary}--\r\n`));
+                    const total = parts.reduce((s, p) => s + p.byteLength, 0);
+                    const body = new Uint8Array(total);
+                    let offset = 0;
+                    for(const part of parts) { body.set(part, offset); offset += part.byteLength; }
+                    data = body.buffer;
+                    extraHeaders['Content-Type'] = `multipart/form-data; boundary=${boundary}`;
+                }
+                else
+                {
+                    data = new FormData();
+                    for(let [key, value] of Object.entries(formData))
+                    {
+                        // The value might be a blob or an ArrayBuffer.  Convert it to a blob.
+                        //
+                        // A bug in Firefox and/or FireMonkey causes the ArrayBuffer to be from the
+                        // page context instead of the script context, which breaks "value instanceof ArrayBuffer".
+                        // We can just not check, since constructing a blob from a blob doesn't hurt
+                        // anything.
+                        if(value.toString() == "[object ArrayBuffer]")
+                            value = new Blob([value]);
+                    
+                        data.append(key, value);
+                    }
                 }
             }
         
@@ -82,7 +121,7 @@ async function Bootstrap({bundle}={})
             }
 
             GM.xmlHttpRequest({
-                method, headers,
+                method, headers: { ...(headers || {}), ...extraHeaders },
                 responseType,
 
                 // TamperMonkey takes a URL object, but ViolentMonkey throws an exception unless we
