@@ -34974,7 +34974,7 @@ async function Bootstrap({bundle}={})
             }
 
             // Strip forbidden headers that Safari rejects
-            const safeHeaders = {};  // start completely empty, no headers at all
+            const safeHeaders = { 'Referer': 'https://www.pixiv.net/' };
             delete safeHeaders['Referer'];
             delete safeHeaders['Origin'];
 
