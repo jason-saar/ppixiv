@@ -34996,6 +34996,8 @@ async function Bootstrap({bundle}={})
     GM.xmlHttpRequest(xhrOptions);
 };
 
+} // closes createXhrHandler
+
     // Listen to requests from helpers._get_xhr_server.
     window.addEventListener("request-download-channel", (e) => {
         console.log('[safari-fix] request-download-channel fired');
