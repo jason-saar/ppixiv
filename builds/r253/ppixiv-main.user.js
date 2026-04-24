@@ -34881,7 +34881,6 @@ async function Bootstrap({bundle}={})
         window.postMessage({ cmd: "download-setup" }, "*", [clientPort]);
 
         serverPort.onmessage = async (e) => {
-            serverPort.onmessage = async (e) => {
             console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
             let responsePort = e.ports[0];
             let {
