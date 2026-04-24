@@ -124,6 +124,11 @@ async function Bootstrap({bundle}={})
                 return;
             }
 
+            // Strip forbidden headers that Safari rejects
+            const safeHeaders = { ...(headers || {}), ...extraHeaders };
+            delete safeHeaders['Referer'];
+            delete safeHeaders['Origin'];
+
             const xhrOptions = {
                 method, 
                 headers: { ...(headers || {}), ...extraHeaders },
