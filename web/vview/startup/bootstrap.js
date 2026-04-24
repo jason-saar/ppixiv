@@ -125,7 +125,7 @@ async function Bootstrap({bundle}={})
             }
 
             // Strip forbidden headers that Safari rejects
-            const safeHeaders = { ...(headers || {}), ...extraHeaders };
+            const safeHeaders = {};  // start completely empty, no headers at all
             delete safeHeaders['Referer'];
             delete safeHeaders['Origin'];
 
