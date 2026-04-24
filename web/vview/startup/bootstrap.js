@@ -32,7 +32,7 @@ async function Bootstrap({bundle}={})
         window.postMessage({ cmd: "download-setup" }, "*", [clientPort]);
 
         serverPort.onmessage = async (e) => {
-            console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
+            console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData, 'responseType:', e.data?.responseType, 'headers:', JSON.stringify(e.data?.headers));
             let responsePort = e.ports[0];
             let {
                 url,
