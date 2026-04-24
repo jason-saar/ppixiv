@@ -124,34 +124,28 @@ async function Bootstrap({bundle}={})
                 return;
             }
 
-            GM.xmlHttpRequest({
-                method, headers: { ...(headers || {}), ...extraHeaders },
-                responseType,
-
-                // TamperMonkey takes a URL object, but ViolentMonkey throws an exception unless we
-                // convert to a string.
+            const xhrOptions = {
+                method, 
+                headers: { ...(headers || {}), ...extraHeaders },
+                responseType: responseType || 'arraybuffer',
                 url: url.toString(),
-                data,
-
                 onload: (result) => {
+                    console.log('[safari-fix] GM.xmlHttpRequest onload, status:', result.status, 'url:', url.toString());
                     let success = result.status < 400;
                     let error = `HTTP ${result.status}`;
                     let { response } = result;
-
-                    // If the response is an ArrayBuffer, add it to the transfer list so we don't
-                    // make a copy.
                     let transfer = [];
                     if(response instanceof ArrayBuffer)
                         transfer.push(response);
-
                     responsePort.xhrServerPostMessage({ success, error, response }, transfer);
                 },
-
-                // This API is broken and doesn't actually include any information about the error.
                 onerror: (e) => {
+                    console.error('[safari-fix] GM.xmlHttpRequest onerror:', e);
                     responsePort.xhrServerPostMessage({ success: false, error: "Request error" });
                 },
-            });
+            };
+            if(data != null) xhrOptions.data = data;
+            GM.xmlHttpRequest(xhrOptions);
         };
     }
 
