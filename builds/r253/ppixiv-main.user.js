@@ -34898,8 +34898,10 @@ async function Bootstrap({bundle}={})
             let extraHeaders = {};
             if(formData)
             {
+                console.log('[safari-fix] GM available:', typeof GM !== 'undefined', 'handler:', GM?.info?.scriptHandler);
                 const isUserscriptsSafari = typeof GM !== 'undefined' &&
                     GM.info?.scriptHandler === 'Userscripts';
+                console.log('[safari-fix] isUserscriptsSafari:', isUserscriptsSafari);
                 if(isUserscriptsSafari)
                 {
                     const boundary = '----ppixivFormData' + Math.random().toString(36).slice(2);
