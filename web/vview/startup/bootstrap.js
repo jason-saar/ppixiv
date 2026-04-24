@@ -32,127 +32,120 @@ async function Bootstrap({bundle}={})
         window.postMessage({ cmd: "download-setup" }, "*", [clientPort]);
 
         serverPort.onmessage = async (e) => {
-            console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData, 'responseType:', e.data?.responseType, 'headers:', JSON.stringify(e.data?.headers));
-            let responsePort = e.ports[0];
-            let {
-                url,
-                method="GET",
-                formData,
-                responseType="arraybuffer",
-                headers=null,
-            } = e.data;
+    console.log('[safari-fix] serverPort.onmessage fired, url:', e.data?.url, 'hasFormData:', !!e.data?.formData);
+    let responsePort = e.ports[0];
+    let {
+        url,
+        method="GET",
+        formData,
+        responseType="arraybuffer",
+        headers=null,
+    } = e.data;
 
-            // console.log("GM.xmlHttpRequest request for:", url);
+    let data = null;
+    let extraHeaders = {};
+    const isCotrans = url?.includes('cotrans.touhou.ai');
 
-            // If we were given a FormData in the form of an object, convert it to a
-            // FormData.  For some reason FormData objects themselves can't be sent
-            // over a MessagePort.
-            let data = null;
-            let extraHeaders = {};
-            if(formData)
+    if(formData && isCotrans)
+    {
+        // Safari/Userscripts fix: serialize FormData manually for Cotrans
+        console.log('[safari-fix] GM available:', typeof GM !== 'undefined', 'handler:', GM?.info?.scriptHandler);
+        const isUserscriptsSafari = typeof GM !== 'undefined' &&
+            GM.info?.scriptHandler === 'Userscripts';
+        console.log('[safari-fix] isUserscriptsSafari:', isUserscriptsSafari);
+        if(isUserscriptsSafari)
+        {
+            const boundary = '----ppixivFormData' + Math.random().toString(36).slice(2);
+            const enc = new TextEncoder();
+            const parts = [];
+            for(let [key, value] of Object.entries(formData))
             {
-                console.log('[safari-fix] GM available:', typeof GM !== 'undefined', 'handler:', GM?.info?.scriptHandler);
-                const isUserscriptsSafari = typeof GM !== 'undefined' &&
-                    GM.info?.scriptHandler === 'Userscripts';
-                console.log('[safari-fix] isUserscriptsSafari:', isUserscriptsSafari);
-                if(isUserscriptsSafari)
+                let header = `--${boundary}\r\nContent-Disposition: form-data; name="${key}"`;
+                if(value.toString() === '[object ArrayBuffer]' || value instanceof Blob)
                 {
-                    const boundary = '----ppixivFormData' + Math.random().toString(36).slice(2);
-                    const enc = new TextEncoder();
-                    const parts = [];
-                    for(let [key, value] of Object.entries(formData))
-                    {
-                        let header = `--${boundary}\r\nContent-Disposition: form-data; name="${key}"`;
-                        if(value.toString() === '[object ArrayBuffer]' || value instanceof Blob)
-                        {
-                            const bytes = value instanceof Blob
-                                ? new Uint8Array(await value.arrayBuffer())
-                                : new Uint8Array(value);
-                            const mime = value instanceof Blob
-                                ? (value.type || 'application/octet-stream')
-                                : 'application/octet-stream';
-                            header += `; filename="blob"\r\nContent-Type: ${mime}\r\n\r\n`;
-                            parts.push(enc.encode(header), bytes, enc.encode('\r\n'));
-                        }
-                        else
-                        {
-                            header += `\r\n\r\n${value}\r\n`;
-                            parts.push(enc.encode(header));
-                        }
-                    }
-                    parts.push(enc.encode(`--${boundary}--\r\n`));
-                    const total = parts.reduce((s, p) => s + p.byteLength, 0);
-                    const body = new Uint8Array(total);
-                    let offset = 0;
-                    for(const part of parts) { body.set(part, offset); offset += part.byteLength; }
-                    data = body.buffer;
-                    extraHeaders['Content-Type'] = `multipart/form-data; boundary=${boundary}`;
+                    const bytes = value instanceof Blob
+                        ? new Uint8Array(await value.arrayBuffer())
+                        : new Uint8Array(value);
+                    const mime = value instanceof Blob
+                        ? (value.type || 'application/octet-stream')
+                        : 'application/octet-stream';
+                    header += `; filename="blob"\r\nContent-Type: ${mime}\r\n\r\n`;
+                    parts.push(enc.encode(header), bytes, enc.encode('\r\n'));
                 }
                 else
                 {
-                    data = new FormData();
-                    for(let [key, value] of Object.entries(formData))
-                    {
-                        // The value might be a blob or an ArrayBuffer.  Convert it to a blob.
-                        //
-                        // A bug in Firefox and/or FireMonkey causes the ArrayBuffer to be from the
-                        // page context instead of the script context, which breaks "value instanceof ArrayBuffer".
-                        // We can just not check, since constructing a blob from a blob doesn't hurt
-                        // anything.
-                        if(value.toString() == "[object ArrayBuffer]")
-                            value = new Blob([value]);
-                    
-                        data.append(key, value);
-                    }
+                    header += `\r\n\r\n${value}\r\n`;
+                    parts.push(enc.encode(header));
                 }
             }
-        
-            // Some script managers don't implement @connect and let user scripts access anything.
-            // Check the hostnames we give access to in case the script manager isn't.
-            url = new URL(url);
-            let allowedHosts = [
-                "i.pximg.net", "i-cf.pximg.net", "cotrans.touhou.ai"
-            ];
-            let anyMatches = false;
-            for(let host of allowedHosts)
-                if(url.hostname.endsWith(host))
-                    anyMatches = true;
-
-            if(!anyMatches)
+            parts.push(enc.encode(`--${boundary}--\r\n`));
+            const total = parts.reduce((s, p) => s + p.byteLength, 0);
+            const body = new Uint8Array(total);
+            let offset = 0;
+            for(const part of parts) { body.set(part, offset); offset += part.byteLength; }
+            data = body.buffer;
+            extraHeaders['Content-Type'] = `multipart/form-data; boundary=${boundary}`;
+        }
+        else
+        {
+            data = new FormData();
+            for(let [key, value] of Object.entries(formData))
             {
-                responsePort.xhrServerPostMessage({ success: false, error: `Unexpected ppdownload URL: ${url}` });
-                return;
+                if(value.toString() == "[object ArrayBuffer]")
+                    value = new Blob([value]);
+                data.append(key, value);
             }
-
-            // Strip forbidden headers that Safari rejects
-            const safeHeaders = { 'Referer': 'https://www.pixiv.net/' };
-            delete safeHeaders['Referer'];
-            delete safeHeaders['Origin'];
-
-            const xhrOptions = {
-                method, 
-                headers: { ...(headers || {}), ...extraHeaders },
-                responseType: responseType || 'arraybuffer',
-                url: url.toString(),
-                onload: (result) => {
-                    console.log('[safari-fix] GM.xmlHttpRequest onload, status:', result.status, 'url:', url.toString());
-                    let success = result.status < 400;
-                    let error = `HTTP ${result.status}`;
-                    let { response } = result;
-                    let transfer = [];
-                    if(response instanceof ArrayBuffer)
-                        transfer.push(response);
-                    responsePort.xhrServerPostMessage({ success, error, response }, transfer);
-                },
-                onerror: (e) => {
-                    console.error('[safari-fix] GM.xmlHttpRequest onerror:', e);
-                    responsePort.xhrServerPostMessage({ success: false, error: "Request error" });
-                },
-            };
-            if(data != null) xhrOptions.data = data;
-            GM.xmlHttpRequest(xhrOptions);
-        };
+        }
     }
+    else if(formData)
+    {
+        // Non-Cotrans FormData — use original approach
+        data = new FormData();
+        for(let [key, value] of Object.entries(formData))
+        {
+            if(value.toString() == "[object ArrayBuffer]")
+                value = new Blob([value]);
+            data.append(key, value);
+        }
+    }
+
+    url = new URL(url);
+    let allowedHosts = ["i.pximg.net", "i-cf.pximg.net", "cotrans.touhou.ai"];
+    let anyMatches = false;
+    for(let host of allowedHosts)
+        if(url.hostname.endsWith(host))
+            anyMatches = true;
+
+    if(!anyMatches)
+    {
+        responsePort.xhrServerPostMessage({ success: false, error: `Unexpected ppdownload URL: ${url}` });
+        return;
+    }
+
+    const xhrOptions = {
+        method,
+        headers: { ...(headers || {}), ...extraHeaders },
+        responseType: responseType || 'arraybuffer',
+        url: url.toString(),
+        withCredentials: true,
+        onload: (result) => {
+            console.log('[safari-fix] GM.xmlHttpRequest onload, status:', result.status, 'url:', url.toString());
+            let success = result.status < 400;
+            let error = `HTTP ${result.status}`;
+            let { response } = result;
+            let transfer = [];
+            if(response instanceof ArrayBuffer)
+                transfer.push(response);
+            responsePort.xhrServerPostMessage({ success, error, response }, transfer);
+        },
+        onerror: (e) => {
+            console.error('[safari-fix] GM.xmlHttpRequest onerror:', e);
+            responsePort.xhrServerPostMessage({ success: false, error: "Request error" });
+        },
+    };
+    if(data != null) xhrOptions.data = data;
+    GM.xmlHttpRequest(xhrOptions);
+};
 
     // Listen to requests from helpers._get_xhr_server.
     window.addEventListener("request-download-channel", (e) => {
