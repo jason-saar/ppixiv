@@ -165,7 +165,8 @@ async function Bootstrap({bundle}={})
         document.documentElement.appendChild(script);
         script.remove();
     }
-
+    console.log('[safari-test] GM.download:', typeof GM?.download);
+    console.log('[safari-test] GM_download:', typeof GM_download !== 'undefined' ? typeof GM_download : 'undefined');
     runScript(bundle);
 }
 
