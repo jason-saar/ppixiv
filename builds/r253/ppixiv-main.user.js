@@ -34987,7 +34987,9 @@ async function Bootstrap({
                 return;
             }
 
-            if (!url.hostname.endsWith("cotrans.touhou.ai"))
+            const safeHeaders = { ...(headers || {}), ...extraHeaders };
+
+            if (!url.hostname.endsWith("pximg.net") && !url.hostname.endsWith("cotrans.touhou.ai"))
                 delete safeHeaders["Origin"];
 
             const xhrOptions = {
