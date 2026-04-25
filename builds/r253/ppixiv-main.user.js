@@ -6452,80 +6452,48 @@ This can be enabled in preferences, and may become the default in a future relea
         reject(null);
         return;
       }
-      url = new URL(url);
-      let { port1: serverResponsePort, port2: clientResponsePort } = new MessageChannel();
-      clientResponsePort.onmessage = (e) => {
-        clientResponsePort.close();
+      let { port1, port2 } = new MessageChannel();
+      port2.onmessage = (e) => {
+        port2.close();
         if (e.data.success)
           accept(e.data.response);
         else
           reject(new Error(e.data.error));
       };
       serverPort.realPostMessage({
-        url: url.toString(),
+        url,
         ...args
-      }, [serverResponsePort]);
+      }, [port1]);
     });
   }
+  async function _downloadViaRealFetch(url) {
+    if (!window.realFetch)
+      throw new Error("realFetch unavailable");
+    const r = await window.realFetch(url, {
+      method: "GET",
+      credentials: "include",
+      referrer: "https:/\x2fwww.pixiv.net/",
+      cache: "force-cache"
+    });
+    if (!r.ok)
+      throw new Error(\`HTTP \${r.status}\`);
+    return await r.arrayBuffer();
+  }
   async function downloadPixivImage(url) {
+    try {
+      return await _downloadViaRealFetch(url);
+    } catch (e) {
+      console.warn(\`realFetch failed for \${url}, falling back to GM.xmlHttpRequest:\`, e);
+    }
     let server = await _getDownloadServer();
     if (server == null)
       throw new Error("Downloading not available");
-    try {
-      return await _downloadUsingServer(server, {
-        url,
-        headers: {
-          "Cache-Control": "max-age=360000",
-          Referer: "https:/\x2fwww.pixiv.net/",
-          Origin: "https:/\x2fwww.pixiv.net/"
-        }
-      });
-    } catch (e) {
-      if (e.message === "HTTP 403") {
-        console.log(\`GM.xmlHttpRequest 403 for \${url}, trying canvas fallback\`);
-        return await _downloadViaCanvas(url);
+    return await _downloadUsingServer(server, {
+      url,
+      responseType: "arraybuffer",
+      headers: {
+        Referer: "https:/\x2fwww.pixiv.net/"
       }
-      throw e;
-    }
-  }
-  async function _downloadViaCanvas(url) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0);
-          canvas.toBlob((blob) => {
-            blob.arrayBuffer().then(resolve).catch(reject);
-          }, "image/jpeg", 0.95);
-        } catch (e) {
-          reject(new Error("Canvas error: " + e.message));
-        }
-      };
-      img.onerror = () => {
-        const img2 = new Image();
-        img2.onload = () => {
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = img2.naturalWidth;
-            canvas.height = img2.naturalHeight;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(img2, 0, 0);
-            canvas.toBlob((blob) => {
-              blob.arrayBuffer().then(resolve).catch(reject);
-            }, "image/jpeg", 0.95);
-          } catch (e) {
-            reject(new Error("Canvas tainted: " + e.message));
-          }
-        };
-        img2.onerror = () => reject(new Error("Image load failed"));
-        img2.src = url;
-      };
-      img.src = url;
     });
   }
   async function sendRequest2(args) {
@@ -35015,8 +34983,8 @@ async function Bootstrap({
                 return;
             }
 
-            const safeHeaders = { ...(headers || {}), ...extraHeaders };
-            delete safeHeaders['Origin'];
+            if (!url.hostname.endsWith("cotrans.touhou.ai"))
+                delete safeHeaders["Origin"];
 
             const xhrOptions = {
                 method,

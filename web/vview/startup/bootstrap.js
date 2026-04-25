@@ -118,8 +118,8 @@ async function Bootstrap({
                 return;
             }
 
-            const safeHeaders = { ...(headers || {}), ...extraHeaders };
-            delete safeHeaders['Origin'];
+            if (!url.hostname.endsWith("cotrans.touhou.ai"))
+                delete safeHeaders["Origin"];
 
             const xhrOptions = {
                 method,
