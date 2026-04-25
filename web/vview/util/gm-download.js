@@ -36,10 +36,10 @@ function _downloadUsingServer(serverPort, { url, ...args })
             return;
         }
 
-        let { port1, port2 } = new MessageChannel();
+        let { port1: serverResponsePort, port2: clientResponsePort } = new MessageChannel();
 
-        port2.onmessage = (e) => {
-            port2.close();
+        clientResponsePort.onmessage = (e) => {
+            clientResponsePort.close();
 
             if(e.data.success)
                 accept(e.data.response);
@@ -47,10 +47,19 @@ function _downloadUsingServer(serverPort, { url, ...args })
                 reject(new Error(e.data.error));
         };
 
-        serverPort.realPostMessage({
-            url,
-            ...args,
-        }, [port1]);
+        // Safari is sensitive to cross-context objects, so force everything
+        // into simple structured-clone-safe primitives.
+        const payload = {
+            url: String(url),
+            method: args.method || "GET",
+            responseType: args.responseType || "arraybuffer",
+            headers: args.headers ? JSON.parse(JSON.stringify(args.headers)) : null,
+        };
+
+        if(args.formData)
+            payload.formData = JSON.parse(JSON.stringify(args.formData));
+
+        serverPort.realPostMessage(payload, [serverResponsePort]);
     });
 }
 
@@ -85,11 +94,11 @@ export async function downloadPixivImage(url)
         throw new Error("Downloading not available");
 
     return await _downloadUsingServer(server, {
-        url,
-        responseType: "arraybuffer",
-        headers: {
-            Referer: "https://www.pixiv.net/",
-        },
+    url: String(url),
+    responseType: "arraybuffer",
+    headers: {
+        "Referer": "https://www.pixiv.net/",
+    },
     });
 }
 

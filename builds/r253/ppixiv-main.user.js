@@ -6452,18 +6452,23 @@ This can be enabled in preferences, and may become the default in a future relea
         reject(null);
         return;
       }
-      let { port1, port2 } = new MessageChannel();
-      port2.onmessage = (e) => {
-        port2.close();
+      let { port1: serverResponsePort, port2: clientResponsePort } = new MessageChannel();
+      clientResponsePort.onmessage = (e) => {
+        clientResponsePort.close();
         if (e.data.success)
           accept(e.data.response);
         else
           reject(new Error(e.data.error));
       };
-      serverPort.realPostMessage({
-        url,
-        ...args
-      }, [port1]);
+      const payload = {
+        url: String(url),
+        method: args.method || "GET",
+        responseType: args.responseType || "arraybuffer",
+        headers: args.headers ? JSON.parse(JSON.stringify(args.headers)) : null
+      };
+      if (args.formData)
+        payload.formData = JSON.parse(JSON.stringify(args.formData));
+      serverPort.realPostMessage(payload, [serverResponsePort]);
     });
   }
   async function _downloadViaRealFetch(url) {
@@ -6489,10 +6494,10 @@ This can be enabled in preferences, and may become the default in a future relea
     if (server == null)
       throw new Error("Downloading not available");
     return await _downloadUsingServer(server, {
-      url,
+      url: String(url),
       responseType: "arraybuffer",
       headers: {
-        Referer: "https:/\x2fwww.pixiv.net/"
+        "Referer": "https:/\x2fwww.pixiv.net/"
       }
     });
   }
