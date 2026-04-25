@@ -34980,6 +34980,9 @@ async function Bootstrap({
                 headers: safeHeaders,
                 responseType: responseType || 'arraybuffer',
                 url: url.toString(),
+
+                anonymous: false, // 🔥 THIS IS THE FIX
+
                 onload: (result) => {
                     console.log('[safari-fix] GM.xmlHttpRequest onload, status:', result.status, 'url:', url.toString());
                     let success = result.status < 400;
