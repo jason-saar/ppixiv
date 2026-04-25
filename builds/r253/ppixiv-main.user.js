@@ -6466,8 +6466,7 @@ This can be enabled in preferences, and may become the default in a future relea
         responseType: args.responseType || "arraybuffer",
         headers: args.headers ? JSON.parse(JSON.stringify(args.headers)) : null
       };
-      if (args.formData)
-        payload.formData = JSON.parse(JSON.stringify(args.formData));
+      console.log("[gm-download] posting clone-safe payload", payload);
       serverPort.realPostMessage(payload, [serverResponsePort]);
     });
   }

@@ -47,8 +47,6 @@ function _downloadUsingServer(serverPort, { url, ...args })
                 reject(new Error(e.data.error));
         };
 
-        // Safari is sensitive to cross-context objects, so force everything
-        // into simple structured-clone-safe primitives.
         const payload = {
             url: String(url),
             method: args.method || "GET",
@@ -56,8 +54,7 @@ function _downloadUsingServer(serverPort, { url, ...args })
             headers: args.headers ? JSON.parse(JSON.stringify(args.headers)) : null,
         };
 
-        if(args.formData)
-            payload.formData = JSON.parse(JSON.stringify(args.formData));
+        console.log("[gm-download] posting clone-safe payload", payload);
 
         serverPort.realPostMessage(payload, [serverResponsePort]);
     });
