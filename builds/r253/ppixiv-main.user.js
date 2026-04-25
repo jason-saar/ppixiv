@@ -6470,37 +6470,16 @@ This can be enabled in preferences, and may become the default in a future relea
       serverPort.realPostMessage(payload, [serverResponsePort]);
     });
   }
-  async function _downloadViaRealFetch(url) {
-    if (!window.realFetch)
-      throw new Error("realFetch unavailable");
-    const r = await window.realFetch(url, {
-      method: "GET",
-      credentials: "include",
-      referrer: "https:/\x2fwww.pixiv.net/",
-      cache: "force-cache"
-    });
-    if (!r.ok)
-      throw new Error(\`HTTP \${r.status}\`);
-    return await r.arrayBuffer();
-  }
   async function downloadPixivImage(url) {
-    try {
-      return await _downloadViaRealFetch(url);
-    } catch (e) {
-      console.warn(\`realFetch failed for \${url}, falling back to GM.xmlHttpRequest:\`, e);
-    }
     let server = await _getDownloadServer();
     if (server == null)
       throw new Error("Downloading not available");
-    let gmUrl = String(url).replace(
-      "https:/\x2fi.pximg.net/",
-      "https:/\x2fi-cf.pximg.net/"
-    );
     return await _downloadUsingServer(server, {
-      url: gmUrl,
+      url: String(url),
       responseType: "arraybuffer",
       headers: {
-        "Referer": "https:/\x2fwww.pixiv.net/"
+        "Referer": "https:/\x2fwww.pixiv.net/",
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
       }
     });
   }

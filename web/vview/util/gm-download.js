@@ -80,26 +80,16 @@ async function _downloadViaRealFetch(url)
 
 export async function downloadPixivImage(url)
 {
-    try {
-        return await _downloadViaRealFetch(url);
-    } catch(e) {
-        console.warn(`realFetch failed for ${url}, falling back to GM.xmlHttpRequest:`, e);
-    }
-
     let server = await _getDownloadServer();
     if(server == null)
         throw new Error("Downloading not available");
 
-    let gmUrl = String(url).replace(
-        "https://i.pximg.net/",
-        "https://i-cf.pximg.net/"
-    );
-
     return await _downloadUsingServer(server, {
-        url: gmUrl,
+        url: String(url),
         responseType: "arraybuffer",
         headers: {
             "Referer": "https://www.pixiv.net/",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         },
     });
 }
