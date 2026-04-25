@@ -90,12 +90,17 @@ export async function downloadPixivImage(url)
     if(server == null)
         throw new Error("Downloading not available");
 
+    let gmUrl = String(url).replace(
+        "https://i.pximg.net/",
+        "https://i-cf.pximg.net/"
+    );
+
     return await _downloadUsingServer(server, {
-    url: String(url),
-    responseType: "arraybuffer",
-    headers: {
-        "Referer": "https://www.pixiv.net/",
-    },
+        url: gmUrl,
+        responseType: "arraybuffer",
+        headers: {
+            "Referer": "https://www.pixiv.net/",
+        },
     });
 }
 

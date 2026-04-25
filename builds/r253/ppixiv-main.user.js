@@ -6492,8 +6492,12 @@ This can be enabled in preferences, and may become the default in a future relea
     let server = await _getDownloadServer();
     if (server == null)
       throw new Error("Downloading not available");
+    let gmUrl = String(url).replace(
+      "https:/\x2fi.pximg.net/",
+      "https:/\x2fi-cf.pximg.net/"
+    );
     return await _downloadUsingServer(server, {
-      url: String(url),
+      url: gmUrl,
       responseType: "arraybuffer",
       headers: {
         "Referer": "https:/\x2fwww.pixiv.net/"
